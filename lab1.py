@@ -6,22 +6,6 @@ from pprint import pprint
 import sys
 import copy
 
-input_node_count = 3
-hidden_node_count = 11
-output_node_count = 2
-
-samples = []
-w_layer1 = []
-w_layer2 = []
-dw_layer1 = [[0] * input_node_count] * (hidden_node_count+1)
-dw_layer2 = [[0] * hidden_node_count] * (output_node_count+1)
-hidden_layer_bias = []
-output_layer_bias = []
-targets = []
-learning_rate = 0.7
-momentum = 0.3
-er = []
-
 #test targets for debugging
 test_targets = [[0,1]] * 400
 
@@ -29,7 +13,119 @@ def activation_function(x):
     return 1/(1 + math.exp(-x))
 def deriv_activation_function(x):
     return activation_function(x)*(1-activation_function(x))
-    
+
+#begin multilayer perceptron
+class ThreeLayerPerceptron(object):
+
+    def __init__(self, _input_count, _hidden_count, _output_count, _samples, 
+                    _targets, _init_weights1, _init_weights2, _init_bias1, _init_bias2,
+                    _learning_rate, _momentum):
+        self.input_node_count = _input_count
+        self.hidden_node_count = _hidden_count
+        self.output_node_count = _output_count
+
+        self.samples = _samples
+        self.w_layer1 = _init_weights1
+        self.w_layer2 = _init_weights2
+        self.dw_layer1 = [[0] * self.input_node_count] * (self.hidden_node_count+1)
+        self.dw_layer2 = [[0] * self.hidden_node_count] * (self.output_node_count+1)
+        self.hidden_layer_bias = _init_bias1
+        self.output_layer_bias = _init_bias2
+        self.targets = _targets
+        self.learning_rate = _learning_rate
+        self.momentum = _momentum
+        self.errors = []
+        
+    def train(self):
+        x = 0
+        while(x < 2000): #run through 2000 epochs (disabled for this assignment)
+        # for each epoch, loop through all self.samples
+            for k in range(len(self.samples)):
+                hidden_layer_aggregation = []
+                output_layer_aggregation = []
+                hidden_layer_outputs = []
+                output_layer_outputs = []
+                output_layer_errors = []
+                
+                # compute aggregate values for input -> hidden layer
+                for currentHiddenNode in range(self.hidden_node_count):
+                    aggregate = 0
+                    for weight in range(len(self.w_layer1[currentHiddenNode])):
+                        aggregate += (self.samples[k][weight] * self.w_layer1[currentHiddenNode][weight])
+                    aggregate += self.hidden_layer_bias[currentHiddenNode]
+                    hidden_layer_aggregation.append(aggregate)
+                    
+                # find hidden layer outputs
+                for aggregateIdx in range(self.hidden_node_count):
+                    output = activation_function(hidden_layer_aggregation[aggregateIdx])
+                    hidden_layer_outputs.append(output)
+                
+                # compute aggregate values for hidden -> output layer
+                for currentOutputNode in range(self.output_node_count):
+                    aggregate = 0
+                    for weight in range(len(self.w_layer2[currentOutputNode])):
+                        aggregate += (hidden_layer_outputs[weight] * self.w_layer2[currentOutputNode][weight])
+                    aggregate += self.output_layer_bias[currentOutputNode]
+                    output_layer_aggregation.append(aggregate)
+                    
+                # find output layer outputs
+                for aggregateIdx in range(self.output_node_count):
+                    output = activation_function(output_layer_aggregation[aggregateIdx])
+                    output_layer_outputs.append(output)
+                        
+                # forward pass done, begin backpropagation   
+                curr_w_layer2 = copy.deepcopy(self.w_layer2) #copies current weights for use in hidden layer backpropagation
+                # start at output neurons, compute weight changes and new weights for weight layer 2
+                for output_neuron in range(self.output_node_count):
+                    dw_entry = [] #stores the previous weight change
+                    e_output = (self.targets[k][output_neuron] - output_layer_outputs[output_neuron]) #calculates output node error
+                    output_layer_errors.append(e_output) #stores error for hidden layer weight change calculation
+                    self.errors.append(e_output)
+                    output_activation_deriv = deriv_activation_function(output_layer_aggregation[output_neuron]) #calculates the output layer aggregates 
+                                                                                                                 #put through the derivative of the sigmoid
+                    for weight in range(len(self.w_layer2[output_neuron])): #for each weight in the layer 2
+                        dw = -self.learning_rate * -e_output * output_activation_deriv * hidden_layer_outputs[weight] #calculate change in weight
+                        self.w_layer2[output_neuron][weight] += dw + self.momentum * self.dw_layer2[output_neuron][weight] #update weight with dw and self.momentum term
+                        dw_entry.append(dw + self.momentum * self.dw_layer2[output_neuron][weight]) #+ self.momentum * self.dw_layer2[output_neuron][weight]) #store previous weight change
+                    db = -self.learning_rate * -e_output * output_activation_deriv * 1 #find change in bias
+                    self.output_layer_bias[output_neuron] += db + self.momentum*self.dw_layer2[output_neuron][-1] #update bias
+                    dw_entry.append(db + self.momentum*self.dw_layer2[output_neuron][-1]) #store bias at the end of self.dw_layer2 array
+                    self.dw_layer2[output_neuron] = dw_entry #store the change in weights for use in the next sample
+                #compute weight changes for hidden layer
+                hidden_layer_errors = []
+                for hidden_neuron in range(self.hidden_node_count):
+                    dw_entry = []
+                    hidden_activation_deriv = deriv_activation_function(hidden_layer_aggregation[hidden_neuron]) #calculates the hidden layer aggregates
+                    sum_of_error_propagation = 0 #initialize sum for error propagation
+                    for output_neuron in range(self.output_node_count): #for each output node
+                        e_output = output_layer_errors[output_neuron] #grab the error for that node
+                        deriv_activation_func_output = deriv_activation_function(output_layer_aggregation[output_neuron])
+                        
+                        #for weight in range(len(curr_w_layer2[0])): #for each weight in layer 2
+                            #sum_of_error_propagation += (curr_w_layer2[output_neuron][weight])# * e_output * deriv_activation_func_output) #add the summation formula to our sum_of_error_propagation variable
+                        sum_of_error_propagation += curr_w_layer2[output_neuron][hidden_neuron] * deriv_activation_func_output * e_output
+                    for weight in range(len(self.w_layer1[hidden_neuron])): #for each weight in layer 1
+                        dw = -self.learning_rate * -sum_of_error_propagation * self.samples[k][weight] * hidden_activation_deriv #find change in weight
+                        self.w_layer1[hidden_neuron][weight] += dw + self.momentum * self.dw_layer1[hidden_neuron][weight] #update that weight
+                        dw_entry.append(dw + self.momentum*self.dw_layer1[hidden_neuron][weight])
+                    db = -self.learning_rate * -sum_of_error_propagation * 1 * hidden_activation_deriv #find change in bias
+                    self.hidden_layer_bias[hidden_neuron] += db + self.momentum*self.dw_layer1[hidden_neuron][-1] #update bias (bias is tacked onto the end of the self.dw_layer1 array)
+                    dw_entry.append(db + self.momentum*self.dw_layer1[hidden_neuron][-1]) #change in bias is held in the self.dw_layer1 array 
+                    self.dw_layer1[hidden_neuron] = dw_entry #save the change in weight for the self.momentum of next sample
+                                
+            s = 0 #calculate and print sum of sqr errors for total epoch
+            for e in self.errors:
+                s += e*e
+            print(s)
+            break; #remove this if doing more than 1 epoch
+            x += 1
+
+samples = []
+targets = []
+w_layer1 = []
+w_layer2 = []
+hidden_layer_bias = []
+output_layer_bias = []
     
 #handles file input
 with open('cross_data (3 inputs - 2 outputs).csv') as csv_file:
@@ -68,120 +164,11 @@ with open("b2 (2 output nodes).csv") as csv_file:
     for row in csv_reader:
         entry = float(row[0])
         output_layer_bias.append(entry)
-
-#begin multilayer perceptron
-x = 0
-while(x < 2000): #run through 2000 epochs (disabled for this assignment)
-# for each epoch, loop through all samples
-    for k in range(len(samples)):
-        hidden_layer_aggregation = []
-        output_layer_aggregation = []
-        hidden_layer_outputs = []
-        output_layer_outputs = []
-        output_layer_errors = []
-        
-        # compute aggregate values for input -> hidden layer
-        for currentHiddenNode in range(hidden_node_count):
-            aggregate = 0
-            for weight in range(len(w_layer1[currentHiddenNode])):
-                aggregate += (samples[k][weight] * w_layer1[currentHiddenNode][weight])
-            aggregate += hidden_layer_bias[currentHiddenNode]
-            hidden_layer_aggregation.append(aggregate)
-            
-        # find hidden layer outputs
-        for aggregateIdx in range(hidden_node_count):
-            output = activation_function(hidden_layer_aggregation[aggregateIdx])
-            hidden_layer_outputs.append(output)
-        
-        # compute aggregate values for hidden -> output layer
-        for currentOutputNode in range(output_node_count):
-            aggregate = 0
-            for weight in range(len(w_layer2[currentOutputNode])):
-                aggregate += (hidden_layer_outputs[weight] * w_layer2[currentOutputNode][weight])
-            aggregate += output_layer_bias[currentOutputNode]
-            output_layer_aggregation.append(aggregate)
-            
-        # find output layer outputs
-        for aggregateIdx in range(output_node_count):
-            output = activation_function(output_layer_aggregation[aggregateIdx])
-            output_layer_outputs.append(output)
-                
-        # forward pass done, begin backpropagation   
-        curr_w_layer2 = copy.deepcopy(w_layer2) #copies current weights for use in hidden layer backpropagation
-        # start at output neurons, compute weight changes and new weights for weight layer 2
-        for output_neuron in range(output_node_count):
-            dw_entry = [] #stores the previous weight change
-            e_output = (targets[k][output_neuron] - output_layer_outputs[output_neuron]) #calculates output node error
-            output_layer_errors.append(e_output) #stores error for hidden layer weight change calculation
-            er.append(e_output)
-            output_activation_deriv = deriv_activation_function(output_layer_aggregation[output_neuron]) #calculates the output layer aggregates 
-                                                                                                         #put through the derivative of the sigmoid
-            for weight in range(len(w_layer2[output_neuron])): #for each weight in the layer 2
-                dw = -learning_rate * -e_output * output_activation_deriv * hidden_layer_outputs[weight] #calculate change in weight
-                w_layer2[output_neuron][weight] += dw + momentum * dw_layer2[output_neuron][weight] #update weight with dw and momentum term
-                dw_entry.append(dw + momentum * dw_layer2[output_neuron][weight]) #+ momentum * dw_layer2[output_neuron][weight]) #store previous weight change
-            db = -learning_rate * -e_output * output_activation_deriv * 1 #find change in bias
-            output_layer_bias[output_neuron] += db + momentum*dw_layer2[output_neuron][-1] #update bias
-            dw_entry.append(db + momentum*dw_layer2[output_neuron][-1]) #store bias at the end of dw_layer2 array
-            dw_layer2[output_neuron] = dw_entry #store the change in weights for use in the next sample
-        #compute weight changes for hidden layer
-        hidden_layer_errors = []
-        for hidden_neuron in range(hidden_node_count):
-            dw_entry = []
-            hidden_activation_deriv = deriv_activation_function(hidden_layer_aggregation[hidden_neuron]) #calculates the hidden layer aggregates
-            sum_of_error_propagation = 0 #initialize sum for error propagation
-            for output_neuron in range(output_node_count): #for each output node
-                e_output = output_layer_errors[output_neuron] #grab the error for that node
-                deriv_activation_func_output = deriv_activation_function(output_layer_aggregation[output_neuron])
-                
-                #for weight in range(len(curr_w_layer2[0])): #for each weight in layer 2
-                    #sum_of_error_propagation += (curr_w_layer2[output_neuron][weight])# * e_output * deriv_activation_func_output) #add the summation formula to our sum_of_error_propagation variable
-                sum_of_error_propagation += curr_w_layer2[output_neuron][hidden_neuron] * deriv_activation_func_output * e_output
-            for weight in range(len(w_layer1[hidden_neuron])): #for each weight in layer 1
-                dw = -learning_rate * -sum_of_error_propagation * samples[k][weight] * hidden_activation_deriv #find change in weight
-                w_layer1[hidden_neuron][weight] += dw + momentum * dw_layer1[hidden_neuron][weight] #update that weight
-                dw_entry.append(dw + momentum*dw_layer1[hidden_neuron][weight])
-            db = -learning_rate * -sum_of_error_propagation * 1 * hidden_activation_deriv #find change in bias
-            hidden_layer_bias[hidden_neuron] += db + momentum*dw_layer1[hidden_neuron][-1] #update bias (bias is tacked onto the end of the dw_layer1 array)
-            dw_entry.append(db + momentum*dw_layer1[hidden_neuron][-1]) #change in bias is held in the dw_layer1 array 
-            dw_layer1[hidden_neuron] = dw_entry #save the change in weight for the momentum of next sample
-        if k == 4:
-            print("Stats:")
-            print("\nOutput bias:");pprint(output_layer_bias)
-            print("\nHidden bias:");pprint(hidden_layer_bias)
-            print("\nWeights layer2:");pprint(w_layer2)
-            print("\nWeights layer1:");pprint(w_layer1)
-            break;
-        #find sum of sqr errors
-        sum_sqr_errors = 0
-        for error in output_layer_errors:
-            sum_sqr_errors += (error*error)
-        #sum_sqr_errors *= 0.5
-        
-        
-        #debugging stuff
-        selection = [_ for _ in range(30)] + [_ for _ in range(300, 314)]
-        
-        if k in selection:
-            print("==Sample #" + str(k) + "==")
-            print("Sum of sqr errors for sample: {:0.8f}".format(sum_sqr_errors))
-            print(str(targets[k][0]) + " -> {:0.8f}".format(output_layer_outputs[0]))
-            print(str(targets[k][1]) + " -> {:0.8f}".format(output_layer_outputs[1]))
-            print("")
-        
-    s = 0 #calculate and print sum of sqr errors for total epoch
-    for e in er:
-        s += e*e
-    print(s)
-    break; #remove this if doing more than 1 epoch
-    x += 1
     
+perceptron = ThreeLayerPerceptron(3, 11, 2, samples, targets, w_layer1, w_layer2,
+                                hidden_layer_bias, output_layer_bias, 0.7, 0.3)
     
-    
-    
-    
-    
-    
+perceptron.train() 
     
     
     
