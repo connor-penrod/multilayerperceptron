@@ -35,11 +35,23 @@ class ThreeLayerPerceptron(object):
         self.learning_rate = _learning_rate
         self.momentum = _momentum
         self.errors = []
+        self.target_error = 0.001
         
     def train(self):
-        x = 0
-        while(x < 2000): #run through 2000 epochs (disabled for this assignment)
+        prevSumSqr = 0
+        currSumSqr = float('infinity')
+        epochCount = 1
+        while abs(prevSumSqr-currSumSqr) >= self.target_error: #run through until sum sqr errors difference is low enough
         # for each epoch, loop through all self.samples
+            
+            print("Training epoch #" + str(epochCount))
+            print("Current sum-of-squared-errors: " + str(currSumSqr))
+            print("Previous sum-of-squared-errors: " + str(prevSumSqr))
+            epochCount += 1
+            
+            prevSumSqr = currSumSqr
+            
+            self.errors = []
             for k in range(len(self.samples)):
                 hidden_layer_aggregation = []
                 output_layer_aggregation = []
@@ -116,9 +128,9 @@ class ThreeLayerPerceptron(object):
             s = 0 #calculate and print sum of sqr errors for total epoch
             for e in self.errors:
                 s += e*e
-            print(s)
-            break; #remove this if doing more than 1 epoch
-            x += 1
+            currSumSqr = s
+            random.shuffle(self.samples) # randomize data for next epoch
+        print("Reached convergence with target error difference = " + str(self.target_error))
 
 samples = []
 targets = []
