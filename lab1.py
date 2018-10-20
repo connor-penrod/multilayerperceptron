@@ -5,6 +5,7 @@ import random
 from pprint import pprint
 import sys
 import copy
+import matplotlib.pyplot as plt
 
 #test targets for debugging
 test_targets = [[0,1]] * 400
@@ -36,6 +37,7 @@ class ThreeLayerPerceptron(object):
         self.momentum = _momentum
         self.errors = []
         self.target_error = 0.001
+        self.sumofsqrerrors = []
         
     def train(self):
         prevSumSqr = 0
@@ -45,8 +47,6 @@ class ThreeLayerPerceptron(object):
         # for each epoch, loop through all self.samples
             
             print("Training epoch #" + str(epochCount))
-            print("Current sum-of-squared-errors: " + str(currSumSqr))
-            print("Previous sum-of-squared-errors: " + str(prevSumSqr))
             epochCount += 1
             
             prevSumSqr = currSumSqr
@@ -113,8 +113,8 @@ class ThreeLayerPerceptron(object):
                         e_output = output_layer_errors[output_neuron] #grab the error for that node
                         deriv_activation_func_output = deriv_activation_function(output_layer_aggregation[output_neuron])
                         
-                        #for weight in range(len(curr_w_layer2[0])): #for each weight in layer 2
-                            #sum_of_error_propagation += (curr_w_layer2[output_neuron][weight])# * e_output * deriv_activation_func_output) #add the summation formula to our sum_of_error_propagation variable
+                        #this missing bit from Part A right here was the reason for my trouble in Part A. Fixed now.
+                        
                         sum_of_error_propagation += curr_w_layer2[output_neuron][hidden_neuron] * deriv_activation_func_output * e_output
                     for weight in range(len(self.w_layer1[hidden_neuron])): #for each weight in layer 1
                         dw = -self.learning_rate * -sum_of_error_propagation * self.samples[k][weight] * hidden_activation_deriv #find change in weight
@@ -129,8 +129,13 @@ class ThreeLayerPerceptron(object):
             for e in self.errors:
                 s += e*e
             currSumSqr = s
+            self.sumofsqrerrors.append(s)
             random.shuffle(self.samples) # randomize data for next epoch
         print("Reached convergence with target error difference = " + str(self.target_error))
+    
+    def plotSumOfSqrErrors(self):
+        plt.plot(self.sumofsqrerrors); plt.xlabel("Epoch"); plt.ylabel("Sum of Sqr. Errors"); plt.title("Sum of Sqr. Errors During Training")
+        plt.show()
 
 samples = []
 targets = []
@@ -181,7 +186,7 @@ perceptron = ThreeLayerPerceptron(3, 11, 2, samples, targets, w_layer1, w_layer2
                                 hidden_layer_bias, output_layer_bias, 0.7, 0.3)
     
 perceptron.train() 
-    
+perceptron.plotSumOfSqrErrors()
     
     
     
